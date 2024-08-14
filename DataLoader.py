@@ -77,8 +77,9 @@ class DataLoader(object):
                     print ("LoadMetadata: theImageGroupIndex: " , theImageGroupIndex , " Load:  result: " , theResult)
                 theImageGroupIndex += 1
             return True
-        except:
+        except Exception as e:
             print ("Could not load file: " + self.mSlidePath)
+            raise(e)
             return False
 
 

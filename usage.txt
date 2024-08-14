@@ -1,0 +1,1 @@
+python test_refresh.py -s "C:\Users\3i\Documents\testing_fast_acq\Slide2.sldy" -i 1

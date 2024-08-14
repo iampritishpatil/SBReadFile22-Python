@@ -12,27 +12,23 @@ def print_usage():
     print ('usage:\npython ',os.path.basename(__file__),' -s sldy_file [-i image_number] [-c channel_number] [-p plot_interval]')
     print ('or (long form)\npython ',os.path.basename(__file__),' --sldy_file=file_path [--image_number=value] [--channel_number=value] [--plot_interval=value]')
 
-def main(argv):
-    theSBFileReader = SBReadFile()
-
-    #work on the first capture
-    theCapture = 0
-    #work on the first channel
-    theChannel = 0
-    #plot frequency in timepoints
-    thePlotFrequency = 10
-
-    if len(sys.argv) < 3:
+def parse_arguments(argv):
+    if len(argv) < 3:
         print_usage()
         sys.exit(2)
 
     theFileName = ''
+    theCapture = 0
+    theChannel = 0
+    thePlotFrequency = 10
+
     try:
         opts, args = getopt.getopt(argv,"hi:c:p:s:",["help","sldy_file=","image_number=","channel_number=","plot_interval="])
     except getopt.GetoptError as err:
         print(err)
         print_usage()
         sys.exit()
+    print (opts)
     for opt, arg in opts:
         if opt in ("-h","--help"):
             print_usage()
@@ -49,7 +45,24 @@ def main(argv):
     if theFileName == "":
         print_usage()
         sys.exit()
+
     print ('Input file: ', theFileName,' image number: ',theCapture, ' channel number: ',theChannel)
+
+    return theFileName, theCapture, theChannel, thePlotFrequency
+
+
+def main(argv):
+    theSBFileReader = SBReadFile()
+
+    #work on the first capture
+    theCapture = 0
+    #work on the first channel
+    theChannel = 0
+    #plot frequency in timepoints
+    thePlotFrequency = 10
+
+    # Call the function in main to parse the arguments
+    theFileName, theCapture, theChannel, thePlotFrequency = parse_arguments(sys.argv[1:])
 
     theSecToWait = 500
     #this secion tries to open the file and see if there is data
@@ -60,7 +73,9 @@ def main(argv):
                 theRes = theSBFileReader.Open(theFileName,All=False) # do not load all the metadata, just essential
                 theImageName = theSBFileReader.GetImageName(theCapture)
                 break
-            except:
+            except Exception as err:
+                print ('Error: ',err)
+                raise(err)
                 time.sleep(1) # sleep 1 sec
                 print (theTry,"...")
                 continue
@@ -122,57 +137,68 @@ def main(argv):
     theNoProgress = 0;
     theTimePaused = 0;
     theMaxWaitS = 5 # wait at most 5 seconds. If over this, quit
-    theSleepS = 0.1 # sleep between refreshes
+    theSleepS = 0.01 # sleep between refreshes
     st = time.time()
-    try:
-        for theRetry in range(0,10000):
-            for theTimepoint in range(theFirstTP,theNumTimepoints):
-                image = theSBFileReader.ReadImagePlaneBuf(theCapture,0,theTimepoint,theZplane,0,True) #captureid,position,timepoint,zplane,channel,as 2d
-                #print ("*** The read buffer len is: " , len(image))
-                #calculate mean intensity using numpy
-                theMean = np.mean(image)
-                print ("*** theTimepoint: " , theTimepoint, "The mean: ",theMean)
-                if theMean==0:
-                    #streaming has missed a timepoint
-                    #insert a break here
-                    print ("****** Mean is 0 ****** ")
 
-                #plot the slice every n timepoints
+    fp = np.memmap(r"D:\testing_slidebook_python\New folder\test2.memmap", dtype='int16', mode='w+', shape=(theNumRows,theNumColumns,theNumTimepoints))
 
-                if theTimepoint%thePlotFrequency==0:
-                    if theTimepoint == 0:
-                        img_artist = plt.imshow(image)
-                    else:
-                        img_artist.set_data(image)
-                    plt.draw()
-                    fig.canvas.flush_events()
-                    plt.title(title.format(tp=theTimepoint,mn=theMean),loc='left')
-                    try:
-                        plt.pause(0.01)
-                    except KeyboardInterrupt:
-                        print("Keyboard Interrupt")
-                        sys.exit()
+    
+    for theRetry in range(0,10000):
+        print ("*** theRetry: ",theRetry)
+        for theTimepoint in range(theFirstTP,theNumTimepoints):
+            image = theSBFileReader.ReadImagePlaneBuf(theCapture,0,theTimepoint,theZplane,0,True) #captureid,position,timepoint,zplane,channel,as 2d
+            #print ("*** The read buffer len is: " , len(image))
+            #calculate mean intensity using numpy
+            theMean = np.mean(image)
+            print ("*** theTimepoint: " , theTimepoint, "The mean: ",theMean)
+            # if theMean==0:
+                #streaming has missed a timepoint
+                #insert a break here
+            # save the image to a memmap
+            fp[:,:,theTimepoint] = image
+            # if theTimepoint%10==0:
+                # fp.flush()
 
-            # see if there are any new timepoints
-            theSBFileReader.Refresh(theCapture)
-            if theFirstTP == theNumTimepoints:
-                theNoProgress += 1
-                time.sleep(theSleepS) # sleep 10 ms
-                theTimePaused += theSleepS
-            else:
-                theNoProgress = 0
-                time.sleep(theSleepS)
+            #plot the slice every n timepoints
 
-            # if we have waited too long, quit
-            if theNoProgress * theSleepS  > theMaxWaitS:
-                break
+            # if theTimepoint%thePlotFrequency==0:
+            if False:                
+                if theTimepoint == 0:
+                    img_artist = plt.imshow(image[:10,:10])
+                    
+                    # img_artist=plt.stairs(*np.histogram(image.flatten(),bins=np.arange(150,250,1)))
+                else:
+                    img_artist.set_data(image[:10,:10])
+                    # img_artist.set_data(*np.histogram(image.flatten(),bins=np.arange(150,250,1)))
+                img_artist.norm.autoscale([170, 250])
+                plt.draw()
+                fig.canvas.flush_events()
+                plt.title(title.format(tp=theTimepoint,mn=theMean),loc='left')
+                try:
+                    plt.pause(0.001)
+                except KeyboardInterrupt:
+                    print("Keyboard Interrupt")
+                    sys.exit()
 
-            #loop again
-            theFirstTP = theNumTimepoints;
-            theNumTimepoints = theSBFileReader.GetNumTimepoints(theCapture)-1
-    except:
-        print("Keyboard Interrupt")
+        # see if there are any new timepoints
+        theSBFileReader.Refresh(theCapture)
         
+        if theFirstTP == theNumTimepoints:
+            theNoProgress += 1
+            time.sleep(theSleepS) # sleep 10 ms
+            theTimePaused += theSleepS
+        else:
+            theNoProgress = 0
+            time.sleep(theSleepS)
+
+        # if we have waited too long, quit
+        if theNoProgress * theSleepS  > theMaxWaitS:
+            break
+
+        #loop again
+        theFirstTP = theNumTimepoints;
+        theNumTimepoints = theSBFileReader.GetNumTimepoints(theCapture)-1
+    
 
     et = time.time()
     elapsed_time = et - st - theTimePaused

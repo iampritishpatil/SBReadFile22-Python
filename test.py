@@ -12,7 +12,7 @@ def main(argv):
     # change it to use your file
     #theSBFileReader.Open("/media/sf_E_DRI VE/Data/Slides/Format 7/SlideBook BCG test data/Slide1.sld")
     if len(sys.argv) < 3:
-        print ('usage: python est.py -i <inputfile>')
+        print ('usage: python test.py -i <inputfile>')
         sys.exit(2)
 
     theFileName = ''
