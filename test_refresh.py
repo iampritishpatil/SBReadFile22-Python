@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 import sys, getopt
 import time
-
+from numpy.lib.format import open_memmap
 
 def print_usage():
     print ('usage:\npython ',os.path.basename(__file__),' -s sldy_file [-i image_number] [-c channel_number] [-p plot_interval]')
@@ -140,9 +140,10 @@ def main(argv):
     theSleepS = 0.01 # sleep between refreshes
     st = time.time()
 
-    fp = np.memmap(r"D:\testing_slidebook_python\New folder\test2.memmap", dtype='int16', mode='w+', shape=(theNumRows,theNumColumns,theNumTimepoints))
+    # fp = np.memmap(r"D:\testing_slidebook_python\New folder\test2.memmap", dtype='int16', mode='w+', shape=(theNumTimepoints,theNumRows,theNumColumns))
 
-    
+    fp = np.memmap(r"Y:\FIOLA_DATA\test3.memmap", dtype='int16', mode='w+', shape=(theNumTimepoints,theNumRows,theNumColumns))
+    # fp = open_memmap(r"Y:\FIOLA_DATA\test2.npy", dtype='int16', mode='w+', shape=(theNumTimepoints,theNumRows,theNumColumns))    
     for theRetry in range(0,10000):
         print ("*** theRetry: ",theRetry)
         for theTimepoint in range(theFirstTP,theNumTimepoints):
@@ -155,9 +156,9 @@ def main(argv):
                 #streaming has missed a timepoint
                 #insert a break here
             # save the image to a memmap
-            fp[:,:,theTimepoint] = image
-            # if theTimepoint%10==0:
-                # fp.flush()
+            fp[theTimepoint,:,:] = np.array(image.copy(),dtype='int16')
+            if theTimepoint%10==0:
+                fp.flush()
 
             #plot the slice every n timepoints
 
