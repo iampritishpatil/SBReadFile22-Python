@@ -1,4 +1,3 @@
 python test_refresh.py -s "C:\Users\3i\Documents\testing_fast_acq\Slide2.sldy" -i 1
 
 
-python test_refresh.py -s "D:\testing_slidebook_python\Slide4.sldy" -i 0
