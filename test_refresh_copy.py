@@ -220,6 +220,7 @@ def main(argv):
 
         input("Press Enter to exit.\n")
         print("Done")
+        break
             
 
 
