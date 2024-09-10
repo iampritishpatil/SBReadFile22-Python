@@ -12,8 +12,10 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "args": [
-                "-s", "C:\\Users\\3i\\Documents\\testing_fast_acq\\Slide2.sldy", "-i" ,"1"
-            ]
+            "-s", "C:\\Users\\3i\\Documents\\testing_fast_acq\\Slide2.sldy", 
+            "-i", "1", 
+            "-r", "40000"
+        ]
         }
     ]
 }
