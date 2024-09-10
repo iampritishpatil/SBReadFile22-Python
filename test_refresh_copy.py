@@ -214,3 +214,12 @@ if __name__ == "__main__":
 
 
 quit()
+
+
+def framegenerator(fps=30, totalframes=1000,latency=10):
+    sleep(10)
+    frame = 0
+    while frame < fps*duration:
+        yield frame
+        frame += 1
+        sleep(1/fps)
