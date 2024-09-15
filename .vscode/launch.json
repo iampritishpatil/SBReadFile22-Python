@@ -5,6 +5,18 @@
     "version": "0.2.0",
     "configurations": [
 
+        // {
+        //     "name": "Python Debugger: Current File with Arguments",
+        //     "type": "debugpy",
+        //     "request": "launch",
+        //     "program": "${file}",
+        //     "console": "integratedTerminal",
+        //     "args": [
+        //     "-s", "C:\\Users\\3i\\Documents\\testing_fast_acq\\Slide2.sldy", 
+        //     "-i", "1", 
+        //     "-r", "40"
+        // ]
+        // }
         {
             "name": "Python Debugger: Current File with Arguments",
             "type": "debugpy",
@@ -14,8 +26,11 @@
             "args": [
             "-s", "C:\\Users\\3i\\Documents\\testing_fast_acq\\Slide2.sldy", 
             "-i", "1", 
-            "-r", "40"
+            "-c", "1",
+            "-fps", "40",
+            "-l","10"
         ]
         }
+
     ]
 }
