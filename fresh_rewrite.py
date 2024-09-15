@@ -1,64 +1,48 @@
 import argparse
 import sys
 from pathlib import Path
-from SBReadFile import *
+from SBReadFile import SBReadFile, CNpyHeader
 import time
 import zarr
 import numpy as np
 
 def parse_arguments():
+    """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="Process some sldy files with optional image number, channel number, and plot interval."
+        description="Process some SLDY files with optional image number, channel number, and plot interval."
     )
     
-    parser.add_argument('-s', '--sldy_file', required=True, 
-                        help='Path to the sldy file')
-    parser.add_argument('-i', '--image_number', type=int, default=0, 
-                        help='Image number (default: 0)')
-    parser.add_argument('-c', '--channel_number', type=int, default=0, 
-                        help='Channel number (default: 0)')
-    # parser.add_argument('-p', '--plot_interval', type=int, default=10, 
-    #                     help='Plot interval (default: 10)')
-    parser.add_argument('-fps', '--frames_per_second', type=int, default=20, 
-                        help='Frames per second (default: 30)')    
-    parser.add_argument('-l', '--latency', type=float, default=10, 
-                        help='Latency in seconds (default: 10)')
-    parser.add_argument('-ch', '--chunks', type=float, default=128, 
-                        help='Latency in seconds (default: 128)')
-    parser.add_argument('-wp', '--write_path', type=str, default='example.zarr')
+    parser.add_argument('-s', '--sldy_file', required=True, help='Path to the SLDY file')
+    parser.add_argument('-i', '--image_number', type=int, default=0, help='Image number (default: 0)')
+    parser.add_argument('-c', '--channel_number', type=int, default=0, help='Channel number (default: 0)')
+    parser.add_argument('-fps', '--frames_per_second', type=int, default=20, help='Frames per second (default: 20)')
+    parser.add_argument('-l', '--latency', type=float, default=10, help='Latency in seconds (default: 10)')
+    parser.add_argument('-ch', '--chunks', type=int, default=128, help='Number of frames per chunk (default: 128)')
+    parser.add_argument('-wp', '--write_path', type=str, default='example.zarr', help='Output path for the Zarr file')
+    
     args = parser.parse_args()
 
-    
-    #print the arguments with a dictionary
     print("Arguments:")
-    for arg in vars(args):
-        print(f'{arg}: {getattr(args, arg)}')
-
+    for arg, value in vars(args).items():
+        print(f'{arg}: {value}')
     
     return args
 
-def main():
-    SBFileReader = SBReadFile()
-
-    # Call the function in main to parse the arguments
-    params = parse_arguments()
-
-    file_path = Path(params.sldy_file)
+def check_file_exists(file_path):
+    """Check if the specified file exists."""
     if not file_path.exists():
         print(f'File not found: {file_path}')
-        sys.exit()
-    sldy_file = SBFileReader.Open(str(file_path),All=False)
-    image_name = SBFileReader.GetImageName(params.image_number)
+        sys.exit(1)
 
-
-
-    num_positions = SBFileReader.GetNumPositions(params.image_number)
-    num_timepoints = SBFileReader.GetNumTimepoints(params.image_number)
-    num_channels = SBFileReader.GetNumChannels(params.image_number)
-    voxel_size = SBFileReader.GetVoxelSize(params.image_number)
-    capture_date = SBFileReader.GetCaptureDate(params.image_number)
-
-    comments = SBFileReader.GetImageComments(params.image_number)
+def print_image_metadata(sb_reader, image_number):
+    """Print metadata for the selected image."""
+    image_name = sb_reader.GetImageName(image_number)
+    num_positions = sb_reader.GetNumPositions(image_number)
+    num_timepoints = sb_reader.GetNumTimepoints(image_number)
+    num_channels = sb_reader.GetNumChannels(image_number)
+    voxel_size = sb_reader.GetVoxelSize(image_number)
+    capture_date = sb_reader.GetCaptureDate(image_number)
+    comments = sb_reader.GetImageComments(image_number)
 
     print(f"Image name: {image_name}")
     print(f"Number of positions: {num_positions}")
@@ -68,105 +52,83 @@ def main():
     print(f"Capture date: {capture_date}")
     print(f"Comments: {comments}")
 
-
-    # num_rows = SBFileReader.GetNumYRows(params.image_number)
-    # num_columns = SBFileReader.GetNumXColumns(params.image_number)
-    # num_planes = SBFileReader.GetNumZPlanes(params.image_number)
-    # # Your processing logic goes here
-    # print(f"Number of rows: {num_rows}")
-    # print(f"Number of columns: {num_columns}")
-    # print(f"Number of planes: {num_planes}")
-
-
-    slide=SBFileReader.mDL
-    image_group = slide.GetImageGroup(params.image_number)
-    num_rows = image_group.GetNumRows()
-    num_columns = image_group.GetNumColumns()
-    num_planes = image_group.GetNumPlanes()
-    image_group.mNpyHeader = CNpyHeader()
-    print(f"Number of rows: {num_rows}")
-    print(f"Number of columns: {num_columns}")
-    print(f"Number of planes: {num_planes}")
+def frames_generator(latency, num_frames, chunks, fps):
+    """Generate frame slices with specified latency and chunk size."""
+    frames = 0
+    print(f"Sleeping for latency of {latency} seconds...")
+    time.sleep(latency)
     
+    fps *=0.98 # reduce the fps by 2% prevent leading the frames
 
-    npy_file=Path(image_group.mFile.GetImageDataFile(image_group.mImageTitle, 0, 0))
+    sleep_time = chunks / fps
+    print(f"Generating frames with {sleep_time:.2f} seconds sleep for each chunk.")
+    start_time = time.time()
+    
+    while frames < num_frames - chunks:
+        while (time.time() - start_time) < frames / fps:
+                print(f"Sleeping  {time.time():.2f} , { start_time:.2f} , {frames / fps:.2f}")
+                time.sleep(sleep_time/4)
+                
+        yield slice(frames, frames + chunks)
+        frames += chunks
+    
+    # Last slice
+    time.sleep(sleep_time)
+    yield slice(frames, num_frames)
+    print(f"Finished generating frames in {time.time() - start_time:.2f} seconds.")
+
+def process_sldy_file(params):
+    """Process the SLDY file and write to a Zarr file."""
+    sb_reader = SBReadFile()
+    file_path = Path(params.sldy_file)
+    
+    check_file_exists(file_path)
+    
+    sldy_file = sb_reader.Open(str(file_path), All=False)
+    print_image_metadata(sb_reader, params.image_number)
+
+    slide = sb_reader.mDL
+    image_group = slide.GetImageGroup(params.image_number)
+    image_group.mNpyHeader = CNpyHeader()
+    
+    npy_file = Path(image_group.mFile.GetImageDataFile(image_group.mImageTitle, 0, 0))
     with open(npy_file, "rb") as file_stream:
-        theRes = image_group.mNpyHeader.ParseNpyHeader(file_stream)
-        thePlaneSize = num_rows * num_columns * image_group.mNpyHeader.mBytesPerPixel
-        theSeekOffset = image_group.mNpyHeader.mHeaderSize
-        print(f"Plane size: {thePlaneSize}")
-        print(f"Seek offset: {theSeekOffset}")
-        print(f"Image group: {image_group}")
-        print("theRes: ",theRes)
+        image_group.mNpyHeader.ParseNpyHeader(file_stream)
 
     num_frames = image_group.mNpyHeader.mShape[0]
+    num_rows, num_columns = image_group.GetNumRows(), image_group.GetNumColumns()
+    plane_size = num_rows * num_columns * image_group.mNpyHeader.mBytesPerPixel
+    seek_offset = image_group.mNpyHeader.mHeaderSize
+
     print(f"Number of frames: {num_frames}")
-    print(image_group.mNpyHeader.mShape)
-
-    def frames_generator():
-        frames = 0
-        print(f"Sleeping for latency of {params.latency} seconds")
-        
-        time.sleep(params.latency)
-        print(f"Generating frames")
-        sleep_time = params.chunks/params.frames_per_second
-        print(f"will sleep for {sleep_time} seconds for each chunk")
-        chunk_num = 0
-        first_time = time.time()
-        curr_time = time.time()
-        print(f"last time: {curr_time}")
-        while frames < num_frames-params.chunks:
-            while time.time() - curr_time < sleep_time:
-                time.sleep(0.01)
-            curr_time = time.time()
-            yield slice(frames, frames + params.chunks)
-            frames += params.chunks
-        #last slice
-
-        yield slice(frames, num_frames)
-        print(f"Finished generating frames")
-        print(f"Total time taken: {time.time()-first_time}")
-
+    print(f"Image dimensions: {num_rows}x{num_columns}")
     
-    
-    frame = 0
     chunk_len = params.chunks
-    chunk_buf = np.zeros((chunk_len,num_rows,num_columns),dtype=np.uint16)
+    zarr_file = zarr.open(
+        Path(params.write_path),
+        mode='w',
+        shape=image_group.mNpyHeader.mShape,
+        dtype='u2',
+        # chunks=(chunk_len, num_rows, num_columns),
+        chunks=(chunk_len, 256, 256),
+        write_empty_chunks=False,
+        overwrite=True,
+        fill_value=0
+    )
 
-
-
-    zarr_file = zarr.open(Path(params.write_path), 
-                mode='w', 
-                shape=image_group.mNpyHeader.mShape, 
-                dtype='u2', 
-                # chunks=(chunk_len,num_rows,num_columns),
-                chunks=(chunk_len,chunk_len,chunk_len),                
-                write_empty_chunks=False,
-                overwrite=True,
-                fill_value=0
-        )    
     with open(npy_file, "rb") as file_stream:
-        file_stream.seek(theSeekOffset,0)
-        # frames_array = np.arange(num_frames)
-        for frame_slice in frames_generator():
-            # print(frame_slice)
-            # iterator = range(frame_slice.start, frame_slice.stop, frame_slice.step)
-            # for i,mod in zip(frames_array[frame_slice],range(chunk_len)):
-            #     frame_bytes = file_stream.read(thePlaneSize)
-            #     np_buffer = np.frombuffer(frame_bytes, dtype=np.uint16)
-            #     np_buffer = np_buffer.reshape(num_rows, num_columns)
-            #     chunk_buf[mod, :, :] = np_buffer
-            #     # print(i,frame)
-            #     assert(i == frame, "frame number mismatch")
-            read_len = frame_slice.stop-frame_slice.start
-            frame_bytes = file_stream.read(thePlaneSize * read_len)
-            np_buffer = np.frombuffer(frame_bytes, dtype=np.uint16).reshape(read_len, num_rows, num_columns)
-            chunk_buf[:read_len, :, :] = np_buffer[:, :, :]
-
-            # print(chunk_buf.shape)
-            # print(chunk_buf.flatten())
-            zarr_file[frame_slice] = chunk_buf[:read_len,:,:]
+        file_stream.seek(seek_offset, 0)
+        for frame_slice in frames_generator(params.latency, num_frames, params.chunks, params.frames_per_second):
+            read_len = frame_slice.stop - frame_slice.start
+            frame_bytes = file_stream.read(plane_size * read_len)
+            np_buffer = np.frombuffer(frame_bytes, dtype=np.uint16).reshape(read_len, num_rows, num_columns).copy()
+            zarr_file[frame_slice] = np_buffer
             print(f"Processed frames {frame_slice}")
+
+def main():
+    """Main function to run the script."""
+    params = parse_arguments()
+    process_sldy_file(params)
 
 if __name__ == "__main__":
     main()
