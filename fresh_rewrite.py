@@ -13,6 +13,7 @@ def parse_arguments():
     )
     
     parser.add_argument('-s', '--sldy_file', required=True, help='Path to the SLDY file')
+    parser.add_argument('-f', '--frames', type=int,required=True , default=10000, help="Total number of frames to copy")
     parser.add_argument('-i', '--image_number', type=int, default=0, help='Image number (default: 0)')
     parser.add_argument('-c', '--channel_number', type=int, default=0, help='Channel number (default: 0)')
     parser.add_argument('-fps', '--frames_per_second', type=int, default=20, help='Frames per second (default: 20)')
@@ -66,7 +67,7 @@ def frames_generator(latency, num_frames, chunks, fps):
     
     while frames < num_frames - chunks:
         while (time.time() - start_time) < frames / fps:
-                print(f"Sleeping  {time.time():.2f} , { start_time:.2f} , {frames / fps:.2f}")
+                # print(f"Sleeping  {time.time():.2f} , { start_time:.2f} , {frames / fps:.2f}")
                 time.sleep(sleep_time/4)
                 
         yield slice(frames, frames + chunks)
@@ -95,7 +96,8 @@ def process_sldy_file(params):
     with open(npy_file, "rb") as file_stream:
         image_group.mNpyHeader.ParseNpyHeader(file_stream)
 
-    num_frames = image_group.mNpyHeader.mShape[0]
+    # num_frames = image_group.mNpyHeader.mShape[0]
+    num_frames = params.frames
     num_rows, num_columns = image_group.GetNumRows(), image_group.GetNumColumns()
     plane_size = num_rows * num_columns * image_group.mNpyHeader.mBytesPerPixel
     seek_offset = image_group.mNpyHeader.mHeaderSize
@@ -107,7 +109,8 @@ def process_sldy_file(params):
     zarr_file = zarr.open(
         Path(params.write_path),
         mode='w',
-        shape=image_group.mNpyHeader.mShape,
+        # shape=image_group.mNpyHeader.mShape,
+        shape=(num_frames, num_rows, num_columns),
         dtype='u2',
         # chunks=(chunk_len, num_rows, num_columns),
         chunks=(chunk_len, 256, 256),

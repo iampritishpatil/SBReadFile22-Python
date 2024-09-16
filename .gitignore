@@ -126,3 +126,4 @@ cython_debug/
 
 #pritish
 data_crap/
+*.zarr
