@@ -10,3 +10,8 @@ python fresh_rewrite.py -s C:\Users\3i\Documents\testing_fast_acq\Slide3.sldy -f
 
 
 python fresh_rewrite.py -s C:\Users\3i\Documents\testing_fast_acq\Slide3.sldy -f 2000 -i 1 -c 1 -fps 20 -l 4 -wp Y:\FIOLA_DATA\SHARED_WITH_LINUX\stim6.zarr -ch 32
+
+
+python sldy_metadata_reader.py "D:\Pritish\2p data\to_analyze\cyrfp_mouse\20240818\Slide1.sldy"
+
+python v2_sldy_metadata_reader.py "D:\Pritish\2p data"
