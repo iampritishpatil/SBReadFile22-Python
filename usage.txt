@@ -7,3 +7,6 @@ python fresh_rewrite.py -s C:\Users\3i\Documents\testing_fast_acq\Slide2.sldy -i
 python fresh_rewrite.py -s C:\Users\3i\Documents\testing_fast_acq\Slide3.sldy -f 30000 -i 0 -c 1 -fps 71 -l 1 -wp Y:\FIOLA_DATA\data_crap\example.zarr -ch 32
 
 python fresh_rewrite.py -s C:\Users\3i\Documents\testing_fast_acq\Slide3.sldy -f 2000 -i 1 -c 1 -fps 20 -l 4 -wp Y:\FIOLA_DATA\data_crap\example2.zarr -ch 32
+
+
+python fresh_rewrite.py -s C:\Users\3i\Documents\testing_fast_acq\Slide3.sldy -f 2000 -i 1 -c 1 -fps 20 -l 4 -wp Y:\FIOLA_DATA\SHARED_WITH_LINUX\stim6.zarr -ch 32

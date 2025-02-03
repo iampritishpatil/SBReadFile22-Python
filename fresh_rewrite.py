@@ -5,6 +5,7 @@ from SBReadFile import SBReadFile, CNpyHeader
 import time
 import zarr
 import numpy as np
+from tqdm import tqdm
 
 def parse_arguments():
     """Parse command line arguments."""
@@ -103,7 +104,7 @@ def process_sldy_file(params):
     seek_offset = image_group.mNpyHeader.mHeaderSize
 
     print(f"Number of frames: {num_frames}")
-    print(f"Image dimensions: {num_rows}x{num_columns}")
+    print(f"Image dimensions: {num_rows}x{num_columns}")    
     
     chunk_len = params.chunks
     zarr_file = zarr.open(
@@ -121,12 +122,13 @@ def process_sldy_file(params):
 
     with open(npy_file, "rb") as file_stream:
         file_stream.seek(seek_offset, 0)
-        for frame_slice in frames_generator(params.latency, num_frames, params.chunks, params.frames_per_second):
+        for frame_slice in tqdm(frames_generator(params.latency, num_frames, params.chunks, params.frames_per_second)):
             read_len = frame_slice.stop - frame_slice.start
             frame_bytes = file_stream.read(plane_size * read_len)
+            # print(f"Read {len(frame_bytes)} bytes for {read_len} frames")
             np_buffer = np.frombuffer(frame_bytes, dtype=np.uint16).reshape(read_len, num_rows, num_columns).copy()
             zarr_file[frame_slice] = np_buffer
-            print(f"Processed frames {frame_slice}")
+            # print(f"Processed frames {frame_slice}")
 
 def main():
     """Main function to run the script."""
